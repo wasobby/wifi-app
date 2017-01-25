@@ -7,6 +7,7 @@ import android.content.Intent;
 import android.content.IntentFilter;
 import android.content.pm.PackageManager;
 import android.net.wifi.ScanResult;
+import android.net.wifi.WifiInfo;
 import android.net.wifi.WifiManager;
 import android.support.annotation.NonNull;
 import android.support.v4.app.ActivityCompat;
@@ -32,6 +33,7 @@ public class MainActivity extends AppCompatActivity {
 
     private static final int REQUEST_LOCATION_ACCESS = 22;
 
+    private WifiInfo mCurrentConnection;
     private ListView mAccessPointsList;
     private ScanResultsAdapter mScanResultsAdapter;
     private List<ScanResult> mScanResults;
@@ -69,21 +71,23 @@ public class MainActivity extends AppCompatActivity {
         switch (requestCode) {
             case REQUEST_LOCATION_ACCESS:
                 if (grantResults.length > 0 && grantResults[0] == PackageManager.PERMISSION_GRANTED) {
-                    startScan();
+                    readyUi();
                 }
             default:
                 //- intentionally left blank
         }
     }
 
-    private void startScan() {
+    private void readyUi() {
         WifiManager wifiManager = (WifiManager)getSystemService(Context.WIFI_SERVICE);
+        mCurrentConnection = wifiManager.getConnectionInfo();
+        displayCurrentConnectionInfo();
         wifiManager.startScan();
     }
 
     private void checkForLocationPermissions() {
         if (ContextCompat.checkSelfPermission(this, Manifest.permission.ACCESS_FINE_LOCATION) == PackageManager.PERMISSION_GRANTED) {
-            startScan();
+            readyUi();
         } else {
             if (ActivityCompat.shouldShowRequestPermissionRationale(this, Manifest.permission.ACCESS_FINE_LOCATION)) {
 
@@ -93,6 +97,18 @@ public class MainActivity extends AppCompatActivity {
                         REQUEST_LOCATION_ACCESS);
             }
         }
+    }
+
+    private void displayCurrentConnectionInfo() {
+        TextView textView = (TextView)findViewById(R.id.ssid);
+        textView.setText(mCurrentConnection.getSSID());
+
+        textView = (TextView)findViewById(R.id.mac_address);
+        textView.setText(mCurrentConnection.getMacAddress());
+
+        int channel = ChannelUtil.convertFrequencyToChannel(mCurrentConnection.getFrequency());
+        textView = (TextView)findViewById(R.id.channel);
+        textView.setText(getString(R.string.configured_wifi_channel, channel));
     }
 
     private class ScanResultsAdapter extends BaseAdapter {

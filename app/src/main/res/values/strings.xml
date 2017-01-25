@@ -1,3 +1,4 @@
 <resources>
     <string name="app_name">Wifi Protector</string>
+    <string name="configured_wifi_channel">CH %d</string>
 </resources>
