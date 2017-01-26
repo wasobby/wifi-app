@@ -1,4 +1,11 @@
 <resources>
-    <string name="app_name">Wifi Protector</string>
-    <string name="configured_wifi_channel">CH %d</string>
+    <string name="app_name">Wifi Inspector</string>
+    <string name="configured_wifi_link_speed">%1$d%2$s</string>
+    <string name="wifi_rssi">%ddBm</string>
+    <string name="wifi_channel">CH %d</string>
+    <string name="wifi_no_ssid">-- NO SSID --</string>
+    <string name="configured_wifi_inspect_button_label">Inspect</string>
+    <string name="inspector_report_title">Report for %s</string>
+    <string name="inspector_best_channels">Best channels: %s</string>
+    <string name="inspector_your_channel">Your channel: %d</string>
 </resources>

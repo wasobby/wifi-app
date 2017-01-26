@@ -14,6 +14,7 @@ import android.support.v4.app.ActivityCompat;
 import android.support.v4.content.ContextCompat;
 import android.support.v7.app.AppCompatActivity;
 import android.os.Bundle;
+import android.util.Pair;
 import android.view.LayoutInflater;
 import android.view.View;
 import android.view.ViewGroup;
@@ -26,8 +27,16 @@ import android.widget.Toast;
 import com.ringrose.noah.wifiprotector.R;
 import com.ringrose.noah.wifiprotector.util.ChannelUtil;
 
+import org.apache.commons.collections4.CollectionUtils;
+import org.apache.commons.collections4.comparators.ComparatorChain;
+import org.apache.commons.lang3.StringUtils;
+
+import java.util.ArrayList;
+import java.util.Collection;
 import java.util.Collections;
+import java.util.HashMap;
 import java.util.List;
+import java.util.Map;
 
 public class MainActivity extends AppCompatActivity {
 
@@ -37,12 +46,14 @@ public class MainActivity extends AppCompatActivity {
     private ListView mAccessPointsList;
     private ScanResultsAdapter mScanResultsAdapter;
     private List<ScanResult> mScanResults;
+    private ArrayList<Integer[]> mChannelList;
 
     @Override
     protected void onCreate(Bundle savedInstanceState) {
         super.onCreate(savedInstanceState);
         setContentView(R.layout.activity_main);
 
+        mChannelList = new ArrayList<>();
         mScanResults = Collections.emptyList();
         mScanResultsAdapter = new ScanResultsAdapter();
         mAccessPointsList = (ListView)findViewById(R.id.access_point_list_view);
@@ -54,6 +65,7 @@ public class MainActivity extends AppCompatActivity {
                 WifiManager wifiManager = (WifiManager)getSystemService(Context.WIFI_SERVICE);
                 mScanResults = wifiManager.getScanResults();
                 mScanResultsAdapter.notifyDataSetChanged();
+                mChannelList = createChannelList(mScanResults);
             }
         }, new IntentFilter(WifiManager.SCAN_RESULTS_AVAILABLE_ACTION));
     }
@@ -76,6 +88,16 @@ public class MainActivity extends AppCompatActivity {
             default:
                 //- intentionally left blank
         }
+    }
+
+    public void handleInspectClicked(View view) {
+        Intent intent = new Intent(this, WifiInspectorActivity.class);
+
+        Bundle args = new Bundle();
+        intent.putExtra(WifiInspectorActivity.ARG_WIFI, mCurrentConnection);
+        intent.putExtra(WifiInspectorActivity.ARG_CHANNELS, mChannelList);
+
+        startActivity(intent);
     }
 
     private void readyUi() {
@@ -104,11 +126,44 @@ public class MainActivity extends AppCompatActivity {
         textView.setText(mCurrentConnection.getSSID());
 
         textView = (TextView)findViewById(R.id.mac_address);
-        textView.setText(mCurrentConnection.getMacAddress());
+        textView.setText(mCurrentConnection.getBSSID());
 
         int channel = ChannelUtil.convertFrequencyToChannel(mCurrentConnection.getFrequency());
         textView = (TextView)findViewById(R.id.channel);
-        textView.setText(getString(R.string.configured_wifi_channel, channel));
+        textView.setText(getString(R.string.wifi_channel, channel));
+
+        textView = (TextView)findViewById(R.id.rssi);
+        textView.setText(getString(R.string.wifi_rssi, mCurrentConnection.getRssi()));
+
+        textView = (TextView)findViewById(R.id.link_speed);
+        textView.setText(getString(R.string.configured_wifi_link_speed, mCurrentConnection.getLinkSpeed(), WifiInfo.LINK_SPEED_UNITS));
+    }
+
+    private ArrayList<Integer[]> createChannelList(List<ScanResult> scanResults) {
+        Map<Integer, Integer[]> channelMap = new HashMap<>();
+
+        for (ScanResult s : scanResults) {
+            int channel = ChannelUtil.convertFrequencyToChannel(s.frequency);
+            Integer[] pair = channelMap.get(channel);
+
+            if (pair == null) {
+                pair = new Integer[] { channel, 0 };
+            }
+
+            pair[1] = pair[1] + 1;
+
+            channelMap.put(channel, pair);
+        }
+
+        ArrayList<Integer[]> channelList = new ArrayList<>(channelMap.values());
+        Collections.sort(channelList, new ComparatorChain<Integer[]>() {
+            @Override
+            public int compare(Integer[] o1, Integer[] o2) throws UnsupportedOperationException {
+                return (o1[1] - o2[1]);
+            }
+        });
+
+        return channelList;
     }
 
     private class ScanResultsAdapter extends BaseAdapter {
@@ -137,17 +192,35 @@ public class MainActivity extends AppCompatActivity {
 
             ScanResult scanResult = (ScanResult)getItem(i);
 
-            TextView textView = (TextView)view.findViewById(R.id.ssid);
-            textView.setText(scanResult.SSID);
+            TextView textView = (TextView)view.findViewById(R.id.wifi_ssid);
 
-            textView = (TextView)view.findViewById(R.id.security);
+            if (StringUtils.isEmpty(scanResult.SSID)) {
+                textView.setText(R.string.wifi_no_ssid);
+            } else {
+                textView.setText(scanResult.SSID);
+            }
+
+            textView = (TextView)view.findViewById(R.id.wifi_mac);
+            textView.setText(scanResult.BSSID);
+
+            textView = (TextView)view.findViewById(R.id.wifi_security);
             textView.setText(scanResult.capabilities);
 
-            textView = (TextView)view.findViewById(R.id.channel);
-            textView.setText(String.valueOf(ChannelUtil.convertFrequencyToChannel(scanResult.frequency)));
+            textView = (TextView)view.findViewById(R.id.wifi_channel);
+            textView.setText(getString(R.string.wifi_channel, ChannelUtil.convertFrequencyToChannel(scanResult.frequency)));
 
-            textView = (TextView)view.findViewById(R.id.signal_strength);
-            textView.setText(String.valueOf(scanResult.level));
+            int signalStrength = scanResult.level;
+
+            textView = (TextView)view.findViewById(R.id.wifi_signal_strength);
+            textView.setText(getString(R.string.wifi_rssi, scanResult.level));
+
+            if (signalStrength <= -85) {
+                textView.setTextColor(getResources().getColor(R.color.wifi_really_bad));
+            } else if (signalStrength <= -65) {
+                textView.setTextColor(getResources().getColor(R.color.wifi_kind_of_bad));
+            } else {
+                textView.setTextColor(getResources().getColor(R.color.textColorSecondary));
+            }
 
             return view;
         }
